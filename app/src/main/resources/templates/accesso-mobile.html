@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Accesso cameriere</title>
+    <link rel="stylesheet" href="/css/mobile.css">
+</head>
+<body class="mobile-body">
+    <main class="mobile-shell">
+        <header class="mobile-header">
+            <p class="mobile-kicker">MyApp · Servizio</p>
+            <h1 class="mobile-title">Accesso cameriere</h1>
+            <p class="mobile-subtitle">Accedi per consultare il menu e inviare gli ordini ai tavoli.</p>
+        </header>
+
+        <form th:action="@{/mobile/login}" method="post" class="mobile-login-form">
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+            <p th:if="${messaggioErrore}" th:text="${messaggioErrore}" class="mobile-login-error"></p>
+            <button type="submit" class="confirm-button">Accedi</button>
+        </form>
+    </main>
+</body>
+</html>

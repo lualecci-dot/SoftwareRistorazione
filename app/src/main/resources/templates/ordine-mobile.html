@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/css/mobile.css">
+</head>
+<body class="mobile-body">
+
+    <main class="mobile-shell">
+        
+        <nav class="mobile-nav">
+            <a href="/mobile/tavoli" class="back-link">← Tavoli</a>
+            <p class="table-label">Tavolo: <span th:text="${tavoloSelezionato}">X</span></p>
+            <form th:action="@{/mobile/logout}" method="post" class="mobile-logout-form">
+                <button type="submit" class="back-link logout-button">Esci</button>
+            </form>
+        </nav>
+
+        <header class="mobile-header">
+            <p class="mobile-kicker">Menu digitale</p>
+            <h1 class="mobile-title">Cosa desideri?</h1>
+            <p class="mobile-subtitle">Tocca un prodotto per aggiungerlo all’ordine.</p>
+        </header>
+
+        <!-- LOOP DINAMICO SULLE TABELLE -->
+        <!-- 'mappaProdotti' (o 'menuDinamico') contiene: NomeTabella -> Lista Record -->
+        <section th:each="entry : ${menuDinamico}" class="category-section">
+            
+            <!-- Mostra il nome della Tabella come titolo della sezione -->
+            <h2 class="category-title" th:text="${entry.key}">NOME TABELLA</h2>
+            
+            <div class="product-list">
+                <!-- Loop sui singoli prodotti di quella specifica tabella -->
+                <div th:each="item : ${entry.value}">
+                    <button type="button" 
+                            class="product-button btn-ordine"
+                            th:data-nome="${item.nome}"
+                            th:data-prezzo="${item.prezzo}"
+                            th:data-categoria="${entry.key}">
+                        <div class="product-row">
+                            <div>
+                                <span th:text="${item.nome}" class="product-name">Nome Prodotto</span>
+                                <small class="product-hint">Tocca per aggiungere</small>
+                            </div>
+                            <span class="price-badge" 
+                                  th:text="${'€ ' + #numbers.formatDecimal(item.prezzo, 1, 2)}">€ 0.00</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Messaggio se non ci sono prodotti -->
+        <div th:if="${#maps.isEmpty(menuDinamico)}" class="empty-state">
+            <p class="text-muted">Nessun prodotto disponibile nel menu.</p>
+        </div>
+
+        <div id="carrello" class="order-bar">
+            <div class="order-heading">
+                <strong>Ordine da confermare</strong>
+                <span id="totale-carrello" class="order-total">€ 0.00</span>
+            </div>
+            <div id="riepilogo-carrello" class="order-summary">Nessun prodotto selezionato</div>
+            <button id="conferma-ordine" type="button" class="confirm-button" disabled>
+                Conferma ordine
+            </button>
+            <button id="riprova-ordine" type="button" class="confirm-button retry-button" hidden>
+                Riprova invio
+            </button>
+            <div id="messaggio-ordine" class="order-message" role="alert" aria-live="assertive"></div>
+        </div>
+
+    </main>
+
+    <!-- Invio e retry idempotente della comanda -->
+    <script>
+        const TAVOLO = "[[${tavoloSelezionato}]]";
+        const STORAGE_KEY = `ordine-pendente:${TAVOLO}`;
+        const carrello = [];
+        let comandaId = null;
+        let invioInCorso = false;
+
+        function nuovoId() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, carattere => {
+                const valore = Math.random() * 16 | 0;
+                return (carattere === 'x' ? valore : (valore & 0x3 | 0x8)).toString(16);
+            });
+        }
+
+        function mostraMessaggio(testo, stato) {
+            const messaggio = document.getElementById('messaggio-ordine');
+            messaggio.textContent = testo;
+            messaggio.className = `order-message ${stato}`;
+        }
+
+        function salvaComandaPendente() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ comandaId, prodotti: carrello }));
+            } catch (errore) {
+                console.warn('Comanda non salvata sul dispositivo:', errore);
+            }
+        }
+
+        function ripristinaComandaPendente() {
+            try {
+                const salvata = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+                if (!salvata || !Array.isArray(salvata.prodotti) || !salvata.comandaId) return;
+                comandaId = salvata.comandaId;
+                carrello.push(...salvata.prodotti.filter(prodotto => prodotto.rigaId));
+                if (carrello.length > 0) {
+                    mostraMessaggio('Comanda non ancora confermata. Premi Riprova invio.', 'error');
+                    aggiornaCarrello();
+                }
+            } catch (errore) {
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        }
+
+        function aggiornaCarrello() {
+            const riepilogo = document.getElementById('riepilogo-carrello');
+            const totale = document.getElementById('totale-carrello');
+            const conferma = document.getElementById('conferma-ordine');
+            const riprova = document.getElementById('riprova-ordine');
+            const totaleValore = carrello.reduce((somma, prodotto) => somma + prodotto.prezzo, 0);
+
+            totale.textContent = '€ ' + totaleValore.toFixed(2);
+            conferma.disabled = carrello.length === 0 || invioInCorso || comandaId !== null;
+            riprova.hidden = comandaId === null || invioInCorso || carrello.length === 0;
+            document.querySelectorAll('.btn-ordine').forEach(button => {
+                button.disabled = comandaId !== null || invioInCorso;
+            });
+
+            riepilogo.textContent = carrello.length === 0
+                ? 'Nessun prodotto selezionato'
+                : carrello.map(prodotto => prodotto.nome + ' - € ' + prodotto.prezzo.toFixed(2)).join(' | ');
+        }
+
+        document.addEventListener('click', event => {
+            const button = event.target.closest('.btn-ordine');
+            if (!button || invioInCorso || comandaId !== null) return;
+
+            const nomeProd = button.getAttribute('data-nome');
+            const prezzoProd = Number.parseFloat(button.getAttribute('data-prezzo'));
+            if (!Number.isFinite(prezzoProd)) return;
+
+            carrello.push({
+                rigaId: nuovoId(),
+                nome: nomeProd,
+                prezzo: prezzoProd,
+                categoria: button.getAttribute('data-categoria') || ''
+            });
+            aggiornaCarrello();
+            button.classList.add('success-flash');
+            setTimeout(() => button.classList.remove('success-flash'), 400);
+        });
+
+        async function inviaComanda() {
+            if (carrello.length === 0 || invioInCorso) return;
+            comandaId = comandaId || nuovoId();
+            invioInCorso = true;
+            salvaComandaPendente();
+            aggiornaCarrello();
+            mostraMessaggio('Invio ordine in corso...', '');
+
+            try {
+                const risposte = await Promise.all(carrello.map(prodotto => fetch('/api/ordini/passa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tavolo: TAVOLO,
+                        prodotto: prodotto.nome,
+                        prezzo: prodotto.prezzo.toFixed(2),
+                        categoria: prodotto.categoria,
+                        comandaId,
+                        rigaId: prodotto.rigaId
+                    })
+                })));
+
+                if (risposte.some(risposta => !risposta.ok)) {
+                    throw new Error('Il server non ha accettato tutti i prodotti.');
+                }
+
+                carrello.length = 0;
+                comandaId = null;
+                localStorage.removeItem(STORAGE_KEY);
+                document.getElementById('messaggio-ordine').textContent = 'Ordine confermato e inviato.';
+                document.getElementById('messaggio-ordine').className = 'order-message success';
+            } catch (errore) {
+                console.error('Errore invio ordine:', errore);
+                const dettaglio = navigator.onLine
+                    ? 'Connessione al gestionale interrotta.'
+                    : 'Connessione Wi-Fi assente.';
+                mostraMessaggio(`${dettaglio} Non è stato possibile confermare l’ordine. È stato conservato: premi Riprova invio.`, 'error');
+                if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+            } finally {
+                invioInCorso = false;
+                aggiornaCarrello();
+            }
+        }
+
+        document.getElementById('conferma-ordine').addEventListener('click', inviaComanda);
+        document.getElementById('riprova-ordine').addEventListener('click', inviaComanda);
+        ripristinaComandaPendente();
+        aggiornaCarrello();
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f6f1">
+    <title th:text="${reparto} + ' | MyApp'">Cucina | MyApp</title>
+    <link rel="stylesheet" href="/css/cucina.css">
+</head>
+<body class="kitchen-body" th:attr="data-api-base=${apiBase},data-reparto=${reparto}">
+    <main class="kitchen-shell">
+        <header class="kitchen-header">
+            <div>
+                <p class="kitchen-kicker" th:text="${'MYAPP / PASS ' + #strings.toUpperCase(reparto)}">MYAPP / PASS CUCINA</p>
+                <h1 th:text="${reparto}">Cucina</h1>
+            </div>
+            <div class="header-actions">
+                <span class="connection-state" id="connection-state" role="status">Connessione in corso</span>
+                <button class="refresh-button" id="refresh-button" type="button" aria-label="Aggiorna comande" title="Aggiorna comande">
+                    <span aria-hidden="true">↻</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="kitchen-layout">
+            <aside class="queue-panel" aria-label="Comande in attesa">
+                <div class="panel-heading">
+                    <h2>In attesa</h2>
+                    <span class="queue-count" id="queue-count">0</span>
+                </div>
+                <div class="queue-list" id="queue-list" aria-live="polite">
+                    <p class="empty-message">Caricamento comande...</p>
+                </div>
+            </aside>
+
+            <section class="detail-panel" aria-label="Dettaglio comanda selezionata">
+                <div class="empty-detail" id="empty-detail">
+                    <span class="empty-mark" aria-hidden="true">—</span>
+                    <h2>Nessuna comanda selezionata</h2>
+                </div>
+                <article id="command-detail" hidden>
+                    <header class="detail-heading">
+                        <div>
+                            <p class="kitchen-kicker">COMANDA</p>
+                            <h2 id="detail-table"></h2>
+                            <p class="detail-meta" id="detail-meta"></p>
+                        </div>
+                        <span class="detail-count" id="detail-count"></span>
+                    </header>
+                    <div class="product-list" id="product-list"></div>
+                    <footer class="detail-footer">
+                        <span class="detail-feedback" id="detail-feedback" role="status"></span>
+                        <button class="complete-button" id="complete-button" type="button">Evadi comanda</button>
+                    </footer>
+                </article>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const coda = document.getElementById('queue-list');
+        const dettaglioVuoto = document.getElementById('empty-detail');
+        const dettaglio = document.getElementById('command-detail');
+        const connectionState = document.getElementById('connection-state');
+        const apiBase = document.body.dataset.apiBase;
+        const reparto = document.body.dataset.reparto;
+        let comande = [];
+        let comandaSelezionata = null;
+
+        function formattaOra(valore) {
+            return new Intl.DateTimeFormat('it-IT', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(new Date(valore));
+        }
+
+        function creaElemento(tag, classe, testo) {
+            const elemento = document.createElement(tag);
+            if (classe) elemento.className = classe;
+            if (testo !== undefined) elemento.textContent = testo;
+            return elemento;
+        }
+
+        function selezionaComanda(id) {
+            comandaSelezionata = id;
+            disegnaCoda();
+            disegnaDettaglio();
+        }
+
+        function disegnaCoda() {
+            document.getElementById('queue-count').textContent = String(comande.length);
+            coda.replaceChildren();
+
+            if (comande.length === 0) {
+                coda.append(creaElemento('p', 'empty-message', 'Nessuna comanda in attesa'));
+                return;
+            }
+
+            for (const comanda of comande) {
+                const prodottiDaUscire = comanda.prodotti.filter(prodotto => !prodotto.uscito).length;
+                const statoCoda = prodottiDaUscire === 0 ? 'Pronta da evadere' : `${prodottiDaUscire} prodotti da preparare`;
+                const pulsante = creaElemento('button', 'queue-item');
+                pulsante.type = 'button';
+                pulsante.setAttribute('aria-pressed', String(comanda.id === comandaSelezionata));
+                pulsante.append(
+                    creaElemento('span', 'queue-table', comanda.tavolo),
+                    creaElemento('span', 'queue-meta', `${comanda.cameriere} · ${formattaOra(comanda.ricevutaIl)}`),
+                    creaElemento('span', 'queue-products', statoCoda)
+                );
+                pulsante.addEventListener('click', () => selezionaComanda(comanda.id));
+                coda.append(pulsante);
+            }
+        }
+
+        function disegnaDettaglio() {
+            const comanda = comande.find(elemento => elemento.id === comandaSelezionata);
+            dettaglio.hidden = !comanda;
+            dettaglioVuoto.hidden = Boolean(comanda);
+            if (!comanda) return;
+
+            document.getElementById('detail-table').textContent = comanda.tavolo;
+            document.getElementById('detail-meta').textContent =
+                `Inviata da ${comanda.cameriere} · ${formattaOra(comanda.ricevutaIl)}`;
+            document.getElementById('detail-count').textContent =
+                `${comanda.prodotti.filter(prodotto => !prodotto.uscito).length} da preparare`;
+            document.getElementById('detail-feedback').textContent = '';
+
+            const elencoProdotti = document.getElementById('product-list');
+            elencoProdotti.replaceChildren();
+            for (const prodotto of comanda.prodotti) {
+                const pulsante = creaElemento('button', `product-item${prodotto.uscito ? ' is-out' : ''}`);
+                pulsante.type = 'button';
+                pulsante.disabled = prodotto.uscito;
+                pulsante.setAttribute('aria-pressed', String(prodotto.uscito));
+                pulsante.append(
+                    creaElemento('span', 'product-name', prodotto.nome),
+                    creaElemento('span', 'product-category', prodotto.categoria || reparto),
+                    creaElemento('span', 'product-state', prodotto.uscito ? 'Uscito' : 'Da preparare')
+                );
+                pulsante.addEventListener('click', () => marcaUscito(prodotto.id));
+                elencoProdotti.append(pulsante);
+            }
+        }
+
+        async function caricaComande() {
+            try {
+                const risposta = await fetch(`${apiBase}/comande`, { headers: { Accept: 'application/json' } });
+                if (!risposta.ok) throw new Error('Coda non disponibile');
+                comande = await risposta.json();
+                connectionState.textContent = 'Aggiornato ora';
+                if (!comande.some(comanda => comanda.id === comandaSelezionata)) {
+                    comandaSelezionata = comande[0]?.id ?? null;
+                }
+                disegnaCoda();
+                disegnaDettaglio();
+            } catch (errore) {
+                connectionState.textContent = 'Connessione non disponibile';
+                coda.replaceChildren(creaElemento('p', 'empty-message error-message', errore.message));
+            }
+        }
+
+        async function marcaUscito(id) {
+            const risposta = await fetch(`${apiBase}/prodotti/${id}/uscito`, { method: 'POST' });
+            if (!risposta.ok) {
+                document.getElementById('detail-feedback').textContent = 'Prodotto non aggiornato. Riprova.';
+                return;
+            }
+            await caricaComande();
+        }
+
+        document.getElementById('complete-button').addEventListener('click', async () => {
+            if (!comandaSelezionata) return;
+            const risposta = await fetch(`${apiBase}/comande/${comandaSelezionata}/evadi`, { method: 'POST' });
+            if (!risposta.ok) {
+                document.getElementById('detail-feedback').textContent = 'Comanda non evasa. Riprova.';
+                return;
+            }
+            comande = comande.filter(comanda => comanda.id !== comandaSelezionata);
+            comandaSelezionata = comande[0]?.id ?? null;
+            disegnaCoda();
+            disegnaDettaglio();
+        });
+
+        document.getElementById('refresh-button').addEventListener('click', caricaComande);
+        caricaComande();
+        window.setInterval(caricaComande, 5000);
+    </script>
+</body>
+</html>

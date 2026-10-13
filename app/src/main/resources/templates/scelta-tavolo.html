@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Seleziona tavolo</title>
+    <link rel="stylesheet" href="/css/mobile.css">
+</head>
+<body class="mobile-body">
+
+    <main class="mobile-shell">
+        <header class="mobile-header">
+            <p class="mobile-kicker">Ordini al tavolo</p>
+            <h1 class="mobile-title">Scegli il tuo tavolo</h1>
+            <p class="mobile-subtitle">Seleziona il tavolo per vedere il menu e preparare il tuo ordine.</p>
+        </header>
+
+        <form th:action="@{/mobile/logout}" method="post" class="mobile-logout-form">
+            <button type="submit" class="back-link logout-button">Esci</button>
+        </form>
+        
+        <div class="table-grid">
+            <div th:each="t : ${tavoli}">
+                <a th:href="@{/mobile/ordine/{nome}(nome=${t})}"
+                   th:classappend="${tavoliOccupati.contains(t)} ? ' table-card-occupied' : ''"
+                   class="table-card">
+                    <span th:text="${t}">Tavolo</span>
+                    <small th:if="${tavoliOccupati.contains(t)}" class="table-card-state">Occupato</small>
+                </a>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane minWidth="900.0" minHeight="600.0" prefWidth="1200.0" prefHeight="760.0" styleClass="page-root" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="myapp.controllers.CamerieriPage">
+    <left>
+        <VBox minWidth="220.0" prefWidth="240.0" spacing="12.0" styleClass="sidebar">
+            <padding><Insets top="26.0" right="18.0" bottom="22.0" left="18.0" /></padding>
+            <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="brand-row">
+                <Label text="M" styleClass="brand-mark" />
+                <VBox spacing="2.0">
+                    <Label text="MYAPP" styleClass="brand-label" />
+                    <Label fx:id="usernameLabel" text="admin" styleClass="muted-label" />
+                </VBox>
+            </HBox>
+            <Separator />
+            <Label text="WORKSPACE" styleClass="sidebar-caption" />
+            <Button maxWidth="1.7976931348623157E308" onAction="#switchToHome" text="Cassa" styleClass="nav-button" />
+            <Button maxWidth="1.7976931348623157E308" onAction="#switchToDatabase" text="Database" styleClass="nav-button" />
+            <Button maxWidth="1.7976931348623157E308" onAction="#aggiornaLista" text="Camerieri" styleClass="nav-button nav-button-active" />
+            <Region VBox.vgrow="ALWAYS" />
+            <Button onAction="#esci" text="Esci" maxWidth="1.7976931348623157E308" styleClass="secondary-button" />
+            <HBox spacing="8.0" styleClass="status-row">
+                <Region styleClass="status-dot" />
+                <Label text="Sistema locale attivo" styleClass="muted-label" />
+            </HBox>
+        </VBox>
+    </left>
+    <center>
+        <HBox spacing="20.0" styleClass="content-area">
+            <padding><Insets top="20.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+            <VBox spacing="12.0" HBox.hgrow="ALWAYS" styleClass="surface-panel">
+                <Label text="Account attivi" styleClass="section-title" />
+                <ListView fx:id="listaCamerieri" VBox.vgrow="ALWAYS" styleClass="data-table" />
+                <Button onAction="#eliminaCameriere" text="Elimina selezionato" maxWidth="1.7976931348623157E308" styleClass="danger-button" />
+            </VBox>
+            <VBox minWidth="280.0" prefWidth="320.0" spacing="12.0" styleClass="surface-panel">
+                <Label text="Nuovo account" styleClass="section-title" />
+                <TextField fx:id="usernameField" promptText="Username" />
+                <PasswordField fx:id="passwordField" promptText="Password (almeno 8 caratteri)" />
+                <Button onAction="#aggiungiCameriere" text="Aggiungi cameriere" maxWidth="1.7976931348623157E308" styleClass="primary-button" />
+            </VBox>
+        </HBox>
+    </center>
+</BorderPane>
